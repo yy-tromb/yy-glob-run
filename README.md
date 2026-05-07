@@ -1,5 +1,6 @@
 # yy-glob-run
-Execute command with expanded glob
+Execute command with expanded glob.  
+This is useful for Windows Command Prompt.
 
 ## Usage on Single mode
 ```
