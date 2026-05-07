@@ -9,3 +9,6 @@ ignore = "0.4.25"
 [[bin]]
 name = "gr"
 path = "src/main.rs"
+
+[profile.release]
+lto = "fat"
