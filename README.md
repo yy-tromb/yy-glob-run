@@ -18,4 +18,4 @@ gr x <options> <command including glob>
 ```
 ### Options
 -p(number of threads): Specify the number of threads to use for parallel execution. default: number of CPU threads
--m(max length): Specify the maximum extend glob. default: 256
+-m(max length): Specify the maximum extending glob. default: 256
