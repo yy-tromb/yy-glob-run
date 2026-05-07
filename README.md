@@ -1,4 +1,4 @@
-# yy-glob-run
+# yy-***g***lob-***r***un
 Execute command with expanded glob.  
 This is useful for Windows Command Prompt.
 
