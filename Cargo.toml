@@ -1,0 +1,11 @@
+[package]
+name = "yy-glob-run"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ignore = "0.4.25"
+
+[[bin]]
+name = "gr"
+path = "src/main.rs"
