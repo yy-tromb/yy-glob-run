@@ -5,6 +5,8 @@ Execute command with expanded glob
 ```
 gr s <options> <command including glob>
 ```
+### Examples
+- `gr s ffprobe -hide_banner *.mp4`
 
 ### Options
 -p(number of threads): Specify the number of threads to use for parallel execution. default: number of CPU threads
