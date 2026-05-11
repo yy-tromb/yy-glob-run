@@ -1,3 +1,4 @@
+use crate::Config;
 use ignore::overrides::OverrideBuilder;
 use ignore::{WalkBuilder, WalkState};
 use std::io::{BufRead, BufReader};
@@ -6,15 +7,14 @@ use std::process::{Command, Stdio, exit};
 use std::sync::Arc;
 
 pub fn single_mode(
-    (command, parallel, threads_number, _max_length, args): (
-        String,
-        bool,
-        Option<usize>,
-        usize,
-        impl Iterator<Item = String>,
-    ),
+    Config {
+        command,
+        parallel,
+        threads_number,
+        max_extend_length: _,
+        args,
+    }: Config,
 ) {
-    let args = args.collect::<Vec<_>>();
     let glob_info = args
         .iter()
         .enumerate()
