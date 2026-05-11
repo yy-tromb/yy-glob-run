@@ -1,4 +1,5 @@
 use crate::Config;
+use crate::label_to_string;
 use ignore::overrides::OverrideBuilder;
 use ignore::{WalkBuilder, WalkState};
 use std::io::{BufRead, BufReader};
@@ -12,6 +13,9 @@ pub fn single_mode(
         parallel,
         threads_number,
         max_extend_length: _,
+        stdout_label,
+        stderr_label,
+        ignore_error,
         args,
     }: Config,
 ) {
@@ -53,11 +57,15 @@ pub fn single_mode(
     // 共有用
     let cmd_arc = Arc::new(command);
     let args_arc = Arc::new(args);
+    let ignore_error_arc = Arc::new(ignore_error);
 
     // 4. 実行ロジック
     // 各ファイルパスに対して、イテレータを回して引数を組み立てる
     let runner = move |path: &Path| {
         let path_str = path.strip_prefix("./").unwrap_or(path).to_string_lossy();
+
+        let stdout_label = label_to_string(&stdout_label, path);
+        let stderr_label = label_to_string(&stderr_label, path);
 
         let replaced_args = args_arc.iter().enumerate().map(|(i, arg)| {
             if i == glob_index {
@@ -70,41 +78,63 @@ pub fn single_mode(
         let mut cmd = Command::new(&*cmd_arc);
         cmd.args(replaced_args); // イテレータをそのまま渡せる
         crate::info!("execute `{cmd:?}`");
-        let mut child = match cmd.stdout(Stdio::inherit()).stderr(Stdio::piped()).spawn() {
+        let mut child = match cmd
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+        {
             Ok(child) => child,
             Err(e) => {
                 crate::error!("Error: {}\n`{cmd:?}`", e);
                 exit(3);
             }
         };
-        // 2. wait する前に stderr を読み切る
+
+        // stdout 用の読み取りスレッド
+        let stdout_handle = child.stdout.take().map(|stdout| {
+            let label_clone = stdout_label.clone();
+            std::thread::spawn(move || {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines().map_while(Result::ok) {
+                    println!("{} {}", label_clone, line);
+                }
+            })
+        });
+
+        // stderr は現在のスレッドで読み取る（これで stdout と stderr を並行処理）
         if let Some(stderr) = child.stderr.take() {
             let reader = BufReader::new(stderr);
-            reader
-                .lines()
-                .map_while(|result| result.ok())
-                .for_each(|line| {
-                    // 由来（ラベル）を付けて出力
-                    eprintln!("[{:?}] {}", path, line);
-                });
+            for line in reader.lines().map_while(Result::ok) {
+                eprintln!("{} {}", stderr_label, line);
+            }
         }
 
-        // 3. 全て読み終わったら終了を待つ
+        // stdout スレッドの終了を待つ
+        if let Some(handle) = stdout_handle {
+            let _ = handle.join();
+        }
+
         let status = match child.wait() {
             Ok(s) => s,
             Err(e) => {
                 crate::error!("Error: {}\n`{cmd:?}`", e);
-                exit(4);
+                if !*ignore_error_arc {
+                    exit(4);
+                } else {
+                    return;
+                }
             }
         };
+
         if status.success() {
             crate::ok!("success `{cmd:?}`")
         } else {
-            crate::error!(
-                "Error: command exited with code {}\n`{cmd:?}`",
-                status.code().unwrap_or(3),
-            );
-            exit(status.code().unwrap_or(3))
+            let code = status.code().unwrap_or(3);
+            crate::error!("Error: command exited with code {code}\n`{cmd:?}`");
+            if !*ignore_error_arc {
+                exit(code);
+            }
         }
     };
 
